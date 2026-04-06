@@ -89,40 +89,42 @@ class NotificationManager extends Manager implements ManagerInterface
             try {
                 $strategy->push($notifiable, $notification, $driver, $scheduleAt);
             
-            if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
-                event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
-            } else {
-                event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiable, $notification, $channelName));
-            }
-        } catch (\Exception $e) {
-            // Only execute synchronous iteration if we are bypassed off database queues 
-            if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
-                $fallbacks = $this->config->get("notify.fallbacks.{$channelName}", []);
-                $fallbackSuccess = false;
-
-                foreach ($fallbacks as $fallbackDriverName) {
-                    try {
-                        $fallbackDriver = $this->channel($fallbackDriverName);
-                        $fallbackDriver->send($notifiable, $notification);
-                        $fallbackSuccess = true;
-                        break;
-                    } catch (\Exception $fallbackException) {
-                        continue; // try next failover
-                    }
-                }
-
-                if ($fallbackSuccess) {
+                if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
                     event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
                 } else {
-                    event(new \Notifluxion\LaravelNotify\Events\NotificationFailed($notifiable, $notification, $channelName, $e));
-                    throw $e; // All drivers flatlined, throw original stack
+                    event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiable, $notification, $channelName));
                 }
-            } else {
-                // If it crashes during a Database push, the MySQL instance is down. We cannot save it natively.
-                throw $e;
+            } catch (\Exception $e) {
+                // Only execute synchronous iteration if we are bypassed off database queues 
+                if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
+                    $fallbacks = $this->config->get("notify.fallbacks.{$channelName}", []);
+                    $fallbackSuccess = false;
+
+                    foreach ($fallbacks as $fallbackDriverName) {
+                        try {
+                            $fallbackDriver = $this->channel($fallbackDriverName);
+                            $fallbackDriver->send($notifiable, $notification);
+                            $fallbackSuccess = true;
+                            break;
+                        } catch (\Exception $fallbackException) {
+                            continue; // try next failover
+                        }
+                    }
+
+                    if ($fallbackSuccess) {
+                        event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
+                    } else {
+                        event(new \Notifluxion\LaravelNotify\Events\NotificationFailed($notifiable, $notification, $channelName, $e));
+                        throw $e; // All drivers flatlined, throw original stack
+                    }
+                } else {
+                    // If it crashes during a Database push, the MySQL instance is down. We cannot save it natively.
+                    throw $e;
+                }
             }
         }
     }
+    
     /**
      * Resolve the active queue strategy.
      *
