@@ -1,5 +1,4 @@
-<?xml version="1.0"?>
-<?phpxml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd" bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache">
   <testsuites>
     <testsuite name="Unit">
@@ -10,12 +9,8 @@
     </testsuite>
   </testsuites>
   <php>
-    <env name="DB_CONNECTION" value="mysql"/>
-    <env name="DB_HOST" value="127.0.0.1"/>
-    <env name="DB_PORT" value="3306"/>
-    <env name="DB_DATABASE" value="notify_test"/>
-    <env name="DB_USERNAME" value="root"/>
-    <env name="DB_PASSWORD" value=""/>
+    <env name="DB_CONNECTION" value="sqlite"/>
+    <env name="DB_DATABASE" value=":memory:"/>
     <!-- Twilio Keys -->
     <env name="TWILIO_SID" value="your_twilio_sid"/>
     <env name="TWILIO_TOKEN" value="your_twilio_token"/>

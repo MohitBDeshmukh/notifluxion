@@ -17,7 +17,7 @@ class NotificationManagerTest extends TestCase
 
     public function test_facade_resolves_the_manager()
     {
-        $this->assertEquals('1.0.0', Notify::version());
+        $this->assertEquals('1.2.0', Notify::version());
     }
 
     public function test_resolves_default_driver()
