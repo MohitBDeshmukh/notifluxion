@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.2] - 2026-04-06
+
+### Added
+- **Architectural Extensibility Documentation**: Extensively logged the intrinsic `Notify::extend()` pipeline directly onto the public `README.md`. This formally documents that End-Users can drop Custom Drivers (like Telegram/Slack/Push) natively into the namespace without altering any core Notifluxion library code while natively inheriting standard retry/fallback queues.
+
 ## [v1.1.1] - 2026-04-06
 
 ### Added

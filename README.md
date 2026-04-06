@@ -105,7 +105,25 @@ $whatsapp = new GenericNotification([
 Notify::send($customer, $whatsapp);
 ```
 
-### 4. Background Queues & Batching
+### 4. Custom Channels (Slack, Push, Telegram)
+Because Notifluxion natively extends Laravel's strict `Manager` class, it securely supports infinite custom drivers out of the box *without* touching the core library! 
+
+Simply implement the `DriverInterface` and bind it into your host App's `AppServiceProvider`:
+
+```php
+use Notifluxion\LaravelNotify\Facades\Notify;
+use App\Drivers\TelegramDriver; // Your custom class
+
+public function boot()
+{
+    Notify::extend('telegram', function ($app) {
+        return new TelegramDriver($app['config']['services.telegram']);
+    });
+}
+```
+Now, you can just set `NOTIFY_DEFAULT_SMS=telegram` in your `.env` and Notifluxion will instantly boot your custom driver and supply it with all the Native fallback, batching, and Queue architectural loops automatically!
+
+### 5. Background Queues & Batching
 To orchestrate intelligent Background daemons (auto-retries, delay backoffs, and fallback drivers enforced natively!), simply turn on `NOTIFY_QUEUE_ENABLED=true` and run:
 ```bash
 php artisan notify:work
