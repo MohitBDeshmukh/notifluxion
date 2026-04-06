@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.3] - 2026-04-06
+
+### Fixed
+- **Host App Resolution Conflict**: Altered `composer.json` primary dependencies to officially support `^12.0` and `^13.0` `illuminate/*` components. Because `laravel/laravel` dynamically boots modern frameworks via `create-project` natively in 2026, the strict `^11.0` upper bound previously crashed Packagist resolutions dynamically locally.
+
 ## [v1.1.2] - 2026-04-06
 
 ### Added
