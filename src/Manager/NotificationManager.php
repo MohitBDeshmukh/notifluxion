@@ -95,7 +95,6 @@ class NotificationManager extends Manager implements ManagerInterface
                     event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiable, $notification, $channelName));
                 }
             } catch (\Exception $e) {
-                // Only execute synchronous iteration if we are bypassed off database queues 
                 if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
                     $fallbacks = $this->config->get("notify.fallbacks.{$channelName}", []);
                     $fallbackSuccess = false;
@@ -107,7 +106,7 @@ class NotificationManager extends Manager implements ManagerInterface
                             $fallbackSuccess = true;
                             break;
                         } catch (\Exception $fallbackException) {
-                            continue; // try next failover
+                            continue;
                         }
                     }
 
@@ -115,16 +114,15 @@ class NotificationManager extends Manager implements ManagerInterface
                         event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
                     } else {
                         event(new \Notifluxion\LaravelNotify\Events\NotificationFailed($notifiable, $notification, $channelName, $e));
-                        throw $e; // All drivers flatlined, throw original stack
+                        throw $e;
                     }
                 } else {
-                    // If it crashes during a Database push, the MySQL instance is down. We cannot save it natively.
                     throw $e;
                 }
             }
         }
     }
-    
+
     /**
      * Resolve the active queue strategy.
      *
@@ -135,7 +133,6 @@ class NotificationManager extends Manager implements ManagerInterface
         $enabled = $this->config->get('notify.queue.enabled', false);
         $strategyType = $enabled ? $this->config->get('notify.queue.strategy', 'database') : 'sync';
 
-        // We bind the strategies in the service provider
         return $this->container->make("notify.strategy.{$strategyType}");
     }
 
