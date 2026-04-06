@@ -49,6 +49,11 @@ class NotificationManager extends Manager implements ManagerInterface
      */
     public function send($notifiables, $notification, $scheduleAt = null): void
     {
+        // Prevent driver caching so that dynamically fetched credentials (e.g. from Redis) are always fresh.
+        if (method_exists($this, 'forgetDrivers')) {
+            $this->forgetDrivers();
+        }
+
         $strategy = $this->resolveQueueStrategy();
         
         $channels = (is_object($notification) && method_exists($notification, 'via')) 
