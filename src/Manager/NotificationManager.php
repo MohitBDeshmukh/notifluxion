@@ -51,11 +51,13 @@ class NotificationManager extends Manager implements ManagerInterface
     {
         $strategy = $this->resolveQueueStrategy();
         
-        $channelName = (is_object($notification) && method_exists($notification, 'via')) 
-            ? ((is_iterable($notifiables) && isset($notifiables[0])) ? $notification->via($notifiables[0])[0] : $notification->via($notifiables)[0]) 
-            : 'email';
-        
-        $driver = $this->channel($this->config->get("notify.default.{$channelName}"));
+        $channels = (is_object($notification) && method_exists($notification, 'via')) 
+            ? ((is_iterable($notifiables) && isset($notifiables[0])) ? $notification->via($notifiables[0]) : $notification->via($notifiables)) 
+            : ['email'];
+
+        if (!is_array($channels)) {
+            $channels = [$channels];
+        }
 
         $dates = [null];
         if ($scheduleAt instanceof \Notifluxion\LaravelNotify\Scheduling\ScheduleBuilder) {
@@ -78,74 +80,86 @@ class NotificationManager extends Manager implements ManagerInterface
                ? $notification->notificationTag() 
                : null;
 
-        // Sub-Job Batching Engine (N+1 Query Elimination)
-        if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\DatabaseQueueStrategy && is_iterable($notifiables) && !is_string($notifiables)) {
-            $inserts = [];
+        $isDatabaseBatch = ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\DatabaseQueueStrategy && is_iterable($notifiables) && !is_string($notifiables));
+        $dbInserts = [];
+        $tenantId = null;
+
+        if ($isDatabaseBatch) {
             $tenantId = app('config')->get('notify.tenant_resolver') 
                 ? call_user_func(app('config')->get('notify.tenant_resolver')) 
                 : (auth()->check() ? auth()->user()->tenant_id ?? null : null);
-               
-            foreach ($notifiables as $notifiable) {
-                foreach ($dates as $date) {
-                    $inserts[] = [
-                        'tenant_id' => $tenantId,
-                        'notifiable_id' => is_object($notifiable) ? ($notifiable->id ?? null) : null,
-                        'notifiable_type' => is_object($notifiable) ? get_class($notifiable) : gettype($notifiable),
-                        'driver' => get_class($driver),
-                        'notification' => serialize(['notifiable' => $notifiable, 'notification' => $notification]),
-                        'status' => 'pending',
-                        'attempts' => 0,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                        'schedule_at' => $date,
-                        'tag' => $tag,
-                    ];
-                }
-            }
-            \Illuminate\Support\Facades\DB::table('scheduled_notifications')->insert($inserts);
-            event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiables, $notification, $channelName));
-            return;
         }
 
-        $iterableNotifiables = (is_iterable($notifiables) && !is_string($notifiables)) ? $notifiables : [$notifiables];
+        foreach ($channels as $channelName) {
+            $driver = $this->channel($this->config->get("notify.default.{$channelName}"));
 
-        foreach ($iterableNotifiables as $notifiable) {
-            foreach ($dates as $date) {
-                try {
-                    $strategy->push($notifiable, $notification, $driver, $date, $tag);
-                
-                    if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
-                        event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
-                    } else {
-                        event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiable, $notification, $channelName));
+            // Sub-Job Batching Engine (N+1 Query Elimination)
+            if ($isDatabaseBatch) {
+                foreach ($notifiables as $notifiable) {
+                    foreach ($dates as $date) {
+                        $dbInserts[] = [
+                            'tenant_id' => $tenantId,
+                            'notifiable_id' => is_object($notifiable) ? ($notifiable->id ?? null) : null,
+                            'notifiable_type' => is_object($notifiable) ? get_class($notifiable) : gettype($notifiable),
+                            'driver' => get_class($driver),
+                            'notification' => serialize(['notifiable' => $notifiable, 'notification' => $notification]),
+                            'status' => 'pending',
+                            'attempts' => 0,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                            'schedule_at' => $date,
+                            'tag' => $tag,
+                        ];
                     }
-            } catch (\Exception $e) {
-                if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
-                    $fallbacks = $this->config->get("notify.fallbacks.{$channelName}", []);
-                    $fallbackSuccess = false;
+                }
+                event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiables, $notification, $channelName));
+                continue;
+            }
 
-                    foreach ($fallbacks as $fallbackDriverName) {
-                        try {
-                            $fallbackDriver = $this->channel($fallbackDriverName);
-                            $fallbackDriver->send($notifiable, $notification);
-                            $fallbackSuccess = true;
-                            break;
-                        } catch (\Exception $fallbackException) {
-                            continue;
+            $iterableNotifiables = (is_iterable($notifiables) && !is_string($notifiables)) ? $notifiables : [$notifiables];
+
+            foreach ($iterableNotifiables as $notifiable) {
+                foreach ($dates as $date) {
+                    try {
+                        $strategy->push($notifiable, $notification, $driver, $date, $tag);
+                    
+                        if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
+                            event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
+                        } else {
+                            event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiable, $notification, $channelName));
+                        }
+                    } catch (\Exception $e) {
+                        if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
+                            $fallbacks = $this->config->get("notify.fallbacks.{$channelName}", []);
+                            $fallbackSuccess = false;
+
+                            foreach ($fallbacks as $fallbackDriverName) {
+                                try {
+                                    $fallbackDriver = $this->channel($fallbackDriverName);
+                                    $fallbackDriver->send($notifiable, $notification);
+                                    $fallbackSuccess = true;
+                                    break;
+                                } catch (\Exception $fallbackException) {
+                                    continue;
+                                }
+                            }
+
+                            if ($fallbackSuccess) {
+                                event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
+                            } else {
+                                event(new \Notifluxion\LaravelNotify\Events\NotificationFailed($notifiable, $notification, $channelName, $e));
+                                throw $e;
+                            }
+                        } else {
+                            throw $e;
                         }
                     }
-
-                    if ($fallbackSuccess) {
-                        event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
-                    } else {
-                        event(new \Notifluxion\LaravelNotify\Events\NotificationFailed($notifiable, $notification, $channelName, $e));
-                        throw $e;
-                    }
-                } else {
-                    throw $e;
                 }
             }
-            }
+        }
+
+        if ($isDatabaseBatch && !empty($dbInserts)) {
+            \Illuminate\Support\Facades\DB::table('scheduled_notifications')->insert($dbInserts);
         }
     }
 

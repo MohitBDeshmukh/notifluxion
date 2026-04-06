@@ -1,0 +1,46 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.1', '8.2', '8.3', '8.4']
+        laravel-version: ['10.*', '11.*', '12.*']
+        
+        # Laravel 11/12 requires PHP 8.2+
+        exclude:
+          - laravel-version: '11.*'
+            php-version: '8.1'
+          - laravel-version: '12.*'
+            php-version: '8.1'
+
+    name: PHP ${{ matrix.php-version }} - Laravel ${{ matrix.laravel-version }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        tools: composer:v2
+        coverage: none
+
+    - name: Require expected Laravel version
+      run: composer require "illuminate/support:${{ matrix.laravel-version }}" --no-update --no-interaction
+
+    - name: Install Dependencies
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+    - name: Execute tests
+      run: vendor/bin/phpunit

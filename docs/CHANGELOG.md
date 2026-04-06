@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.2.1] - 2026-04-06
+
+### Added
+- **Omnichannel Broadcasting**: Refactored the core `NotificationManager` engine to natively support broadcasting the exact same notification payload across *multiple* concurrent channels simultaneously. `via()` methods can now return string arrays (e.g., `['email', 'sms']`).
+- **Omnichannel Batching**: Sub-job SQL batching natively loops over all channels and target users simultaneously, flattening massive omnichannel blasts into a single raw DB query insert.
+
 ## [v1.2.0] - 2026-04-06
 
 ### Added

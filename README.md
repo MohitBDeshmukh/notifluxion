@@ -129,11 +129,61 @@ To orchestrate intelligent Background daemons (auto-retries, delay backoffs, and
 php artisan notify:work
 ```
 
+### 6. Omnichannel Broadcasting
+Notifluxion effortlessly routes a singular Notification class across multiple channels concurrently. Simply return a target array natively from your `via()` methods!
+
+```php
+// Inside your Notification class
+public function via($notifiable) {
+    return tap([], function(&$channels) use ($notifiable) {
+        if ($notifiable->email) $channels[] = 'email';
+        if ($notifiable->phone_number) $channels[] = 'sms';
+    });
+}
+```
+*Note: Using this concurrently triggers the `Sub-Job Batching Engine`. A 5,000 user blast routed to both Email and SMS compiles seamlessly into a strictly optimized SQL bulk-insert!*
+
+### 7. Advanced Reminder Engine (Scheduling & Cascades)
+You do not need to boot complex Laravel Schedulers or cron expressions to handle delayed sequences. Notifluxion natively supports reverse/forward interval cascades pushed instantly across drivers.
+
+```php
+use Notifluxion\LaravelNotify\Scheduling\ScheduleBuilder;
+
+// Trigger notifications precisely 24 hours, 1 hour, and 15 mins before a meeting!
+$schedule = (new ScheduleBuilder())->before($meeting->start_date, ['24h', '1h', '15m']);
+
+Notify::send($user, new MeetingReminder(), $schedule);
+```
+
+**Cancellable Tags Support**: Because Redis delayed jobs naturally block standard queues, any Notification returning a native `notificationTag()` interface can be halted globally securely!
+
+```php
+Notify::cancelTag("invoice_1234_reminders");
+```
+
 ## 🧪 Testing
-The architecture natively contains a decoupled testing sandbox to execute your live triggers dynamically! 
+The library enforces strict test coverage and behavioral assertions. We natively support dual testing loops.
+
+**1. Automated Unit Suite**
+To execute the isolated PHPUnit behavioral tests:
+```bash
+vendor/bin/phpunit
+```
+
+**2. Live Driver Sandbox**
+To execute the live architectural sandbox and verify your `.env` API credentials are actively broadcasting properly, run the included daemon:
+
+*(If installed inside a regular Laravel application):*
+```bash
+php artisan notify:test-live
+```
+
+*(If developing the package locally):*
 ```bash
 vendor/bin/testbench notify:test-live
 ```
+
+*Note: All core use-cases and driver tests are continually logged. Verify the Test Case Registry for detailed scenario outputs.*
 
 ---
 
