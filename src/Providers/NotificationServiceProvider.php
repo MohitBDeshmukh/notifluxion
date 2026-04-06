@@ -26,6 +26,7 @@ class NotificationServiceProvider extends ServiceProvider
         // Queue Strategies bindings
         $this->app->bind('notify.strategy.sync', \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy::class);
         $this->app->bind('notify.strategy.database', \Notifluxion\LaravelNotify\Queue\Strategies\DatabaseQueueStrategy::class);
+        $this->app->bind('notify.strategy.redis', \Notifluxion\LaravelNotify\Queue\Strategies\RedisQueueStrategy::class);
 
         // Alias for the facade
         $this->app->bind('notify', function ($app) {
