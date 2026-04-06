@@ -26,6 +26,7 @@ return new class extends Migration
     public function down()
     {
         Schema::table('scheduled_notifications', function (Blueprint $table) {
+            $table->dropIndex(['tag']);
             $table->dropColumn('tag');
         });
     }

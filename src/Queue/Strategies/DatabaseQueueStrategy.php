@@ -84,11 +84,11 @@ class DatabaseQueueStrategy implements QueueStrategyInterface
                 $wrapper = unserialize($notification->notification);
                 $notificationObj = is_array($wrapper) ? $wrapper['notification'] : $wrapper;
 
-                if ($notifiableId) {
+                if ($notifiableId && method_exists($notifiableClass, 'find')) {
                     $notifiable = $notifiableClass::find($notifiableId);
                 } else {
                     // Recover transient CLI object state directly from the wrapper
-                    $notifiable = (is_array($wrapper) && isset($wrapper['notifiable'])) ? $wrapper['notifiable'] : new $notifiableClass;
+                    $notifiable = (is_array($wrapper) && isset($wrapper['notifiable'])) ? $wrapper['notifiable'] : (class_exists($notifiableClass) ? new $notifiableClass : null);
                 }
                 
                 $driverClass = $notification->driver;

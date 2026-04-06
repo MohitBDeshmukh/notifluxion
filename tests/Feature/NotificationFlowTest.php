@@ -31,8 +31,11 @@ class NotificationFlowTest extends TestCase
 
         $payload = ['message' => 'Hello Real World!'];
 
-        // If the driver is executed, our dummy sender returns true!
-        // We will mock the driver slightly to ensure the method gets called, or just assert it throws no exceptions.
+        // Mock the SMTP driver to prevent real network connections
+        $mockDriver = \Mockery::mock(\Notifluxion\LaravelNotify\Drivers\Email\SmtpDriver::class);
+        $mockDriver->shouldReceive('send')->once()->andReturn(true);
+        Notify::extend('smtp', function() use ($mockDriver) { return $mockDriver; });
+
         Notify::send($user, $payload);
         
         // If it got here on Sync mode without exception, the dispatch worked.
@@ -66,7 +69,8 @@ class NotificationFlowTest extends TestCase
         $this->assertNotNull($dbRow);
         
         $unserialized = unserialize($dbRow->notification);
-        $this->assertEquals('Async Database Message!', $unserialized['message']);
+        $notificationData = is_array($unserialized) ? $unserialized['notification'] : $unserialized;
+        $this->assertEquals('Async Database Message!', $notificationData['message']);
     }
 
     public function test_database_strategy_can_process_queue()
@@ -84,6 +88,11 @@ class NotificationFlowTest extends TestCase
         $this->assertDatabaseHas('scheduled_notifications', ['status' => 'pending']);
 
         // Actually trigger the queue processor!
+        // First mock the SendGrid target so it passes smoothly
+        $mockDriver = \Mockery::mock(\Notifluxion\LaravelNotify\Drivers\Email\SmtpDriver::class);
+        $mockDriver->shouldReceive('send')->once()->andReturn(true);
+        $this->app->instance(\Notifluxion\LaravelNotify\Drivers\Email\SmtpDriver::class, $mockDriver);
+        
         $strategy = $this->app->make('notify.strategy.database');
         $strategy->process();
 
