@@ -32,34 +32,81 @@ Execute the built-in scaffolding daemon to boot the config file and migrate the 
 php artisan notify:install
 ```
 
-Configure your `.env` variables securely natively:
+Configure your `.env` variables safely inside your main Laravel application natively:
 ```dotenv
+# Core Routings
+NOTIFY_EMAIL_DRIVER=smtp
+NOTIFY_SMS_DRIVER=twilio
+NOTIFY_WHATSAPP_DRIVER=api
+NOTIFY_EMAIL_FALLBACK=sendgrid
+
+# Queue Scale Metrics
 NOTIFY_QUEUE_ENABLED=true
 NOTIFY_QUEUE_STRATEGY=database
+NOTIFY_QUEUE_RETRIES=3
+NOTIFY_QUEUE_DELAY_MINS=5
+
+# API Bindings
 NOTIFY_SENDGRID_KEY=SG.your_token
 TWILIO_SID=AC...
+TWILIO_TOKEN=your_token
+TWILIO_FROM=+10000000000
+WHATSAPP_TOKEN=your_meta_token
+WHATSAPP_PHONE_ID=your_meta_phone_id
 ```
 
-## 🚀 Basic Usage
+## 🚀 Multi-Channel Usage Maps
 
-The architecture is totally decoupled from standard rigid boilerplate setups. 
+The architecture uses a unified strategy. You provide a payload array, and Notifluxion routes it dynamically based on the channel attributes inside your `$notifiable` user object.
 
-Send an aggressive dynamic template array to 5,000 endpoints:
+### 1. Email Channel (SendGrid / SMTP)
+The email driver automatically intercepts arrays of addresses or singular objects containing an `email` property. It natively renders generic keys or compiles actual `.blade.php` files dynamically!
+
 ```php
 use Notifluxion\LaravelNotify\Facades\Notify;
 use Notifluxion\LaravelNotify\Notifications\GenericNotification;
 
 $users = ['mohit@example.com', 'admin@example.com'];
 
-// Send multiple triggers instantaneously! 
 Notify::send($users, [
     'subject' => 'System Scales Flawlessly!',
+    'cc' => ['team@example.com'],
+    'bcc' => ['compliance@example.com'],
     'view' => 'emails.marketing', 
     'viewData' => ['name' => 'Mohit']
 ]);
 ```
 
-Trigger the intelligent Background daemon (auto-retries, delay backoffs, and fallback drivers enforced natively!)
+### 2. SMS Channel (Twilio)
+To trigger an SMS dispatch, your target object must contain a `phone_number` property and you specify the `"sms"` channel tag.
+
+```php
+$user = new \stdClass();
+$user->phone_number = '+14155552671';
+
+// Trigger Twilio Pipeline natively
+$sms = new GenericNotification(['message' => 'Your OTP is 98213!'], 'sms');
+Notify::send($user, $sms);
+```
+
+### 3. WhatsApp Channel (Meta API)
+To hit the Meta WhatsApp Cloud API seamlessly, ensure your target object uses `whatsapp_number`, and inject your exact Meta Template name.
+
+```php
+$customer = new \stdClass();
+$customer->whatsapp_number = '14155552671';
+
+// Trigger WhatsApp Cloud Pipeline
+$whatsapp = new GenericNotification([
+    'template' => 'hello_world',
+    'language' => 'en_US'
+], 'whatsapp');
+
+Notify::send($customer, $whatsapp);
+```
+
+### 4. Background Queues & Batching
+To orchestrate intelligent Background daemons (auto-retries, delay backoffs, and fallback drivers enforced natively!), simply turn on `NOTIFY_QUEUE_ENABLED=true` and run:
 ```bash
 php artisan notify:work
 ```

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.1] - 2026-04-06
+
+### Added
+- **Packagist Preparation**: Restructured `composer.json` namespaces directly linking the `mohitbdeshmukh/notifluxion` generic GitHub pipeline mapping to avoid collision. Implemented MIT License tracking.
+- **Provider Documentation**: Scaled `README.md` exhaustively to surface comprehensive `SMS`, `Email`, and `WhatsApp` configuration limits + exhaustive multi-environment variables maps for host installations.
+
 ## [v1.1.0] - 2026-04-06
 
 ### Added
