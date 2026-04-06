@@ -44,10 +44,10 @@ class NotificationManager extends Manager implements ManagerInterface
      *
      * @param mixed $notifiable
      * @param mixed $notification
-     * @param \DateTimeInterface|null $scheduleAt
+     * @param \DateTimeInterface|array|\Notifluxion\LaravelNotify\Scheduling\ScheduleBuilder|null $scheduleAt
      * @return void
      */
-    public function send($notifiables, $notification, ?\DateTimeInterface $scheduleAt = null): void
+    public function send($notifiables, $notification, $scheduleAt = null): void
     {
         $strategy = $this->resolveQueueStrategy();
         
@@ -57,6 +57,27 @@ class NotificationManager extends Manager implements ManagerInterface
         
         $driver = $this->channel($this->config->get("notify.default.{$channelName}"));
 
+        $dates = [null];
+        if ($scheduleAt instanceof \Notifluxion\LaravelNotify\Scheduling\ScheduleBuilder) {
+            $dates = $scheduleAt->getDates();
+        } elseif (is_iterable($scheduleAt)) {
+            $builder = new \Notifluxion\LaravelNotify\Scheduling\ScheduleBuilder();
+            foreach ($scheduleAt as $dt) {
+                if ($dt instanceof \DateTimeInterface) {
+                    $builder->exact($dt);
+                } elseif (is_string($dt)) {
+                    $builder->after(now(), $dt);
+                }
+            }
+            $dates = $builder->getDates();
+        } elseif ($scheduleAt) {
+            $dates = [$scheduleAt instanceof \DateTimeInterface ? clone $scheduleAt : \Carbon\Carbon::parse($scheduleAt)];
+        }
+
+        $tag = $notification instanceof \Notifluxion\LaravelNotify\Contracts\CancellableNotification 
+               ? $notification->notificationTag() 
+               : null;
+
         // Sub-Job Batching Engine (N+1 Query Elimination)
         if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\DatabaseQueueStrategy && is_iterable($notifiables) && !is_string($notifiables)) {
             $inserts = [];
@@ -65,18 +86,21 @@ class NotificationManager extends Manager implements ManagerInterface
                 : (auth()->check() ? auth()->user()->tenant_id ?? null : null);
                
             foreach ($notifiables as $notifiable) {
-                $inserts[] = [
-                    'tenant_id' => $tenantId,
-                    'notifiable_id' => is_object($notifiable) ? ($notifiable->id ?? null) : null,
-                    'notifiable_type' => is_object($notifiable) ? get_class($notifiable) : gettype($notifiable),
-                    'driver' => get_class($driver),
-                    'notification' => serialize(['notifiable' => $notifiable, 'notification' => $notification]),
-                    'status' => 'pending',
-                    'attempts' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                    'schedule_at' => $scheduleAt,
-                ];
+                foreach ($dates as $date) {
+                    $inserts[] = [
+                        'tenant_id' => $tenantId,
+                        'notifiable_id' => is_object($notifiable) ? ($notifiable->id ?? null) : null,
+                        'notifiable_type' => is_object($notifiable) ? get_class($notifiable) : gettype($notifiable),
+                        'driver' => get_class($driver),
+                        'notification' => serialize(['notifiable' => $notifiable, 'notification' => $notification]),
+                        'status' => 'pending',
+                        'attempts' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                        'schedule_at' => $date,
+                        'tag' => $tag,
+                    ];
+                }
             }
             \Illuminate\Support\Facades\DB::table('scheduled_notifications')->insert($inserts);
             event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiables, $notification, $channelName));
@@ -86,14 +110,15 @@ class NotificationManager extends Manager implements ManagerInterface
         $iterableNotifiables = (is_iterable($notifiables) && !is_string($notifiables)) ? $notifiables : [$notifiables];
 
         foreach ($iterableNotifiables as $notifiable) {
-            try {
-                $strategy->push($notifiable, $notification, $driver, $scheduleAt);
-            
-                if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
-                    event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
-                } else {
-                    event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiable, $notification, $channelName));
-                }
+            foreach ($dates as $date) {
+                try {
+                    $strategy->push($notifiable, $notification, $driver, $date, $tag);
+                
+                    if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
+                        event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notification, $channelName));
+                    } else {
+                        event(new \Notifluxion\LaravelNotify\Events\NotificationQueued($notifiable, $notification, $channelName));
+                    }
             } catch (\Exception $e) {
                 if ($strategy instanceof \Notifluxion\LaravelNotify\Queue\Strategies\SyncQueueStrategy) {
                     $fallbacks = $this->config->get("notify.fallbacks.{$channelName}", []);
@@ -120,7 +145,19 @@ class NotificationManager extends Manager implements ManagerInterface
                     throw $e;
                 }
             }
+            }
         }
+    }
+
+    /**
+     * Cancel pending jobs grouped by a specific tag.
+     *
+     * @param string $tag
+     * @return int The number of cancelled jobs
+     */
+    public function cancelTag(string $tag): int
+    {
+        return $this->resolveQueueStrategy()->cancelByTag($tag);
     }
 
     /**
@@ -143,7 +180,7 @@ class NotificationManager extends Manager implements ManagerInterface
      */
     public static function version(): string
     {
-        return '1.0.0';
+        return '1.2.0';
     }
 
     /**

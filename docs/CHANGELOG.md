@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.2.0] - 2026-04-06
+
+### Added
+- **Advanced Reminder Engine**: Natively supports relative interval cascades (`remindBefore` / `remindAfter`) replacing manual application-level Cron parsing overhead completely. 
+- **Cancellable Tags**: Injected `CancellableNotification` contracts allowing dynamic Redis and Database jobs to be halted instantly via `Notify::cancelTag('invoice_x')` commands natively.
+- **Dynamic Rehydration Hooks**: Standardized the `RehydratesState` interface to gracefully fetch and validate DB state exactly at background queue execution time, aborting jobs dynamically if bounds verify false.
+
+### Impact & Migrations
+- **Migrations**: New migration added for `tag` column. Execute `php artisan migrate` sequentially.
+
 ## [v1.1.3] - 2026-04-06
 
 ### Fixed

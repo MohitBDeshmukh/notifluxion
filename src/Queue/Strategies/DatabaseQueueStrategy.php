@@ -15,9 +15,10 @@ class DatabaseQueueStrategy implements QueueStrategyInterface
      * @param mixed $notification
      * @param DriverInterface $driver
      * @param \DateTimeInterface|null $scheduleAt
+     * @param string|null $tag
      * @return mixed
      */
-    public function push($notifiable, $notification, DriverInterface $driver, ?\DateTimeInterface $scheduleAt = null)
+    public function push($notifiable, $notification, DriverInterface $driver, ?\DateTimeInterface $scheduleAt = null, ?string $tag = null)
     {
         $tenantId = app('config')->get('notify.tenant_resolver') 
             ? call_user_func(app('config')->get('notify.tenant_resolver')) 
@@ -34,11 +35,23 @@ class DatabaseQueueStrategy implements QueueStrategyInterface
             'created_at' => now(),
             'updated_at' => now(),
             'schedule_at' => $scheduleAt,
+            'tag' => $tag,
         ];
 
         DB::table('scheduled_notifications')->insert($payload);
         
         return true;
+    }
+
+    /**
+     * Cancel pending jobs grouped by a specific tag.
+     *
+     * @param string $tag
+     * @return int
+     */
+    public function cancelByTag(string $tag): int
+    {
+        return DB::table('scheduled_notifications')->where('tag', $tag)->delete();
     }
 
     /**
@@ -90,6 +103,15 @@ class DatabaseQueueStrategy implements QueueStrategyInterface
 
                 $driver = new $driverClass($driverConfig);
                 
+                if ($notificationObj instanceof \Notifluxion\LaravelNotify\Contracts\RehydratesState) {
+                    if (!$notificationObj->rehydrate($notifiable)) {
+                        DB::table('scheduled_notifications')
+                            ->where('id', $notification->id)
+                            ->update(['status' => 'cancelled', 'updated_at' => now()]);
+                        continue;
+                    }
+                }
+
                 // Execute actual notification logic securely!
                 $driver->send($notifiable, $notificationObj);
 

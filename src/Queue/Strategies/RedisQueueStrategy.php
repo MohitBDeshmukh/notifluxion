@@ -10,23 +10,58 @@ class RedisQueueStrategy implements QueueStrategyInterface
 {
     protected string $queue = 'notify_queue';
 
-    public function push($notifiable, $notification, DriverInterface $driver, ?\DateTimeInterface $scheduleAt = null)
+    public function push($notifiable, $notification, DriverInterface $driver, ?\DateTimeInterface $scheduleAt = null, ?string $tag = null)
     {
         $payload = [
             'notifiable_id' => $notifiable->id ?? null,
             'notifiable_type' => get_class($notifiable),
             'driver' => get_class($driver),
             'notification' => serialize(['notifiable' => $notifiable, 'notification' => $notification]),
-            'attempts' => 0
+            'attempts' => 0,
+            'tag' => $tag
         ];
 
+        $jsonPayload = json_encode($payload);
+
         if ($scheduleAt) {
-            Redis::zadd($this->queue . ':delayed', $scheduleAt->getTimestamp(), json_encode($payload));
+            Redis::zadd($this->queue . ':delayed', $scheduleAt->getTimestamp(), $jsonPayload);
         } else {
-            Redis::rpush($this->queue, json_encode($payload));
+            Redis::rpush($this->queue, $jsonPayload);
+        }
+        
+        if ($tag) {
+            Redis::sadd($this->queue . ':tags:' . $tag, $jsonPayload);
         }
         
         return true;
+    }
+
+    /**
+     * Cancel pending jobs grouped by a specific tag.
+     *
+     * @param string $tag
+     * @return int
+     */
+    public function cancelByTag(string $tag): int
+    {
+        $key = $this->queue . ':tags:' . $tag;
+        $items = Redis::smembers($key);
+        
+        if (empty($items)) {
+            return 0;
+        }
+        
+        $count = 0;
+        foreach ($items as $item) {
+            $removedFromDelay = Redis::zrem($this->queue . ':delayed', $item);
+            $removedFromMain = Redis::lrem($this->queue, 0, $item);
+            if ($removedFromDelay || $removedFromMain) {
+                $count++;
+            }
+        }
+        
+        Redis::del($key);
+        return $count;
     }
 
     public function process(): void
@@ -52,6 +87,10 @@ class RedisQueueStrategy implements QueueStrategyInterface
 
             $payload = json_decode($payloadRaw, true);
             
+            if (!empty($payload['tag'])) {
+                Redis::srem($this->queue . ':tags:' . $payload['tag'], $payloadRaw);
+            }
+            
             try {
                 $notifiableClass = $payload['notifiable_type'];
                 $notifiableId = $payload['notifiable_id'];
@@ -74,6 +113,13 @@ class RedisQueueStrategy implements QueueStrategyInterface
                 else $driverConfig = [];
 
                 $driver = new $driverClass($driverConfig);
+                
+                if ($notificationObj instanceof \Notifluxion\LaravelNotify\Contracts\RehydratesState) {
+                    if (!$notificationObj->rehydrate($notifiable)) {
+                        continue; // Abort send due to stale state
+                    }
+                }
+
                 $driver->send($notifiable, $notificationObj);
 
             } catch (\Exception $e) {
@@ -81,7 +127,11 @@ class RedisQueueStrategy implements QueueStrategyInterface
                 
                 if ($payload['attempts'] < $maxRetries) {
                     $delay = $configBase['queue']['retry_delay'] ?? 5;
-                    Redis::zadd($this->queue . ':delayed', now()->addMinutes($delay)->getTimestamp(), json_encode($payload));
+                    $newPayloadRaw = json_encode($payload);
+                    Redis::zadd($this->queue . ':delayed', now()->addMinutes($delay)->getTimestamp(), $newPayloadRaw);
+                    if (!empty($payload['tag'])) {
+                        Redis::sadd($this->queue . ':tags:' . $payload['tag'], $newPayloadRaw);
+                    }
                 } else {
                     // Fallback logic
                     $channel = 'custom';
@@ -102,7 +152,11 @@ class RedisQueueStrategy implements QueueStrategyInterface
                         if ($fallbackClass && $fallbackClass !== $driverClass) {
                             $payload['driver'] = $fallbackClass;
                             $payload['attempts'] = 0;
-                            Redis::rpush($this->queue, json_encode($payload));
+                            $fallbackPayloadRaw = json_encode($payload);
+                            Redis::rpush($this->queue, $fallbackPayloadRaw);
+                            if (!empty($payload['tag'])) {
+                                Redis::sadd($this->queue . ':tags:' . $payload['tag'], $fallbackPayloadRaw);
+                            }
                         }
                     }
                 }
