@@ -8,6 +8,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use stdClass;
 
+class DatabaseTestDummyDriver implements \Notifluxion\LaravelNotify\Contracts\DriverInterface
+{
+    public function __construct($config = []) {}
+    public function send($notifiable, $notification): void {}
+}
+
 class NotificationFlowTest extends TestCase
 {
     use RefreshDatabase;
@@ -88,10 +94,8 @@ class NotificationFlowTest extends TestCase
         $this->assertDatabaseHas('scheduled_notifications', ['status' => 'pending']);
 
         // Actually trigger the queue processor!
-        // First mock the SendGrid target so it passes smoothly
-        $mockDriver = \Mockery::mock(\Notifluxion\LaravelNotify\Drivers\Email\SmtpDriver::class);
-        $mockDriver->shouldReceive('send')->once()->andReturn(true);
-        $this->app->instance(\Notifluxion\LaravelNotify\Drivers\Email\SmtpDriver::class, $mockDriver);
+        // Swap the pending row driver to our Dummy class natively simulating a generic broadcast 
+        DB::table('scheduled_notifications')->update(['driver' => DatabaseTestDummyDriver::class]);
         
         $strategy = $this->app->make('notify.strategy.database');
         $strategy->process();

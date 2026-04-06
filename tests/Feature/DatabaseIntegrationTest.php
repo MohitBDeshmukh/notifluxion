@@ -13,8 +13,6 @@ class DatabaseIntegrationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
-        // Load the package's migrations for Testbench to discover
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
     }
 
