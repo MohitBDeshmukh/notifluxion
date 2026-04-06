@@ -1,0 +1,8 @@
+/vendor/
+.phpunit.cache
+.env
+.env.testing
+phpunit.xml.bak
+node_modules/
+npm-debug.log
+yarn-error.log

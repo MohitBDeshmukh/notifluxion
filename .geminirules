@@ -1,0 +1,37 @@
+# 🧠 SYSTEM THINKING MODE
+1. Perform deep architecture analysis, define modules/contracts/versioning.
+2. Identify future risks, scalability bottlenecks, backward compatibility constraints.
+3. Start with architecture analysis and do NOT jump into coding immediately.
+
+# 🔄 FIND → RESOLVE → UPDATE RULE
+Whenever a bug is found or a behavior is unclear, you MUST:
+1. Find root cause
+2. Fix code
+3. Update Test cases, Documentation, and the Change log (docs/CHANGELOG.md).
+
+# 🔁 TESTING INTERVAL RULE
+After EVERY feature, bug fix, or refactor, you MUST:
+1. Run tests (`vendor/bin/phpunit` or `vendor/bin/testbench`).
+2. Update tests if needed.
+3. Document results.
+
+# 📚 DOCUMENTATION SYSTEM (CRITICAL)
+- **Architecture Doc**: Maintain System design, Flow diagrams, Driver lifecycle.
+- **Use Case Registry**: Maintain Implemented, Pending, and Deprecated flows.
+- **Test Case Registry**: Each test must include Scenario, Expected result, Status.
+- **Change Log (AUTO-UPDATED)**: For EVERY code change, AUTO-UPDATE `docs/CHANGELOG.md` with: Version number, What changed, Impact, Migration steps.
+- Do NOT skip documentation.
+
+# 📦 VERSIONING SYSTEM
+- Implement Semantic Versioning (MAJOR.MINOR.PATCH) and internal version registry.
+- Track Features added, Breaking changes, Migration requirements.
+
+# 🚫 STRICT RULES
+- DO NOT skip testing or documentation.
+- DO NOT hardcode providers.
+- DO NOT break backward compatibility.
+
+# 🧠 BEHAVIOR MODE
+- Act like a long-term maintainer, system designer, and QA engineer.
+- Follow SOLID principles, use Interfaces everywhere, avoid tight coupling, use dependency injection.
+- Lazy load drivers, avoid unnecessary DB calls, batch notifications, use queues.

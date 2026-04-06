@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<?phpxml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd" bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache">
+  <testsuites>
+    <testsuite name="Unit">
+      <directory>tests/Unit</directory>
+    </testsuite>
+    <testsuite name="Feature">
+      <directory>tests/Feature</directory>
+    </testsuite>
+  </testsuites>
+  <php>
+    <env name="DB_CONNECTION" value="mysql"/>
+    <env name="DB_HOST" value="127.0.0.1"/>
+    <env name="DB_PORT" value="3306"/>
+    <env name="DB_DATABASE" value="notify_test"/>
+    <env name="DB_USERNAME" value="root"/>
+    <env name="DB_PASSWORD" value=""/>
+    <!-- Twilio Keys -->
+    <env name="TWILIO_SID" value="your_twilio_sid"/>
+    <env name="TWILIO_TOKEN" value="your_twilio_token"/>
+    <env name="TWILIO_FROM" value="+10000000000"/>
+    <!-- WhatsApp Keys -->
+    <env name="WHATSAPP_TOKEN" value="your_meta_permanent_token"/>
+    <env name="WHATSAPP_PHONE_ID" value="your_meta_phone_number_id"/>
+    <!-- Sendgrid Keys -->
+    <env name="NOTIFY_SENDGRID_KEY" value="SG.your_sendgrid_token"/>
+    <!-- SMTP Keys -->
+    <env name="MAIL_MAILER" value="smtp"/>
+    <env name="MAIL_HOST" value="smtp.gmail.com"/>
+    <env name="MAIL_PORT" value="587"/>
+    <env name="MAIL_USERNAME" value="your_email@example.com"/>
+    <env name="MAIL_PASSWORD" value="your_app_password"/>
+    <env name="MAIL_ENCRYPTION" value="tls"/>
+    <env name="MAIL_FROM_ADDRESS" value="no-reply@example.com"/>
+    <env name="MAIL_FROM_NAME" value="Test"/>
+  </php>
+  <source>
+    <include>
+      <directory suffix=".php">src</directory>
+    </include>
+  </source>
+</phpunit>

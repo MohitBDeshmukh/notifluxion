@@ -1,0 +1,89 @@
+<?php
+
+namespace Notifluxion\LaravelNotify\Console\Commands;
+
+use Illuminate\Console\Command;
+use Notifluxion\LaravelNotify\Contracts\QueueStrategyInterface;
+
+class WorkCommand extends Command
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'notify:work';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Process the pending notifications queue stored in the database.';
+
+    /**
+     * Execute the console command.
+     *
+     * @return int
+     */
+    public function handle()
+    {
+        $this->info('Starting Notification Queue Worker...');
+
+        // Force reload core configurations since we are likely traversing via Testbench
+        $xmlPath = getcwd() . '/phpunit.xml';
+        if (file_exists($xmlPath)) {
+            $xml = simplexml_load_file($xmlPath);
+            if (isset($xml->php->env)) {
+                foreach ($xml->php->env as $envAttribute) {
+                    $name = (string)$envAttribute['name'];
+                    $value = (string)$envAttribute['value'];
+                    putenv("{$name}={$value}");
+                    $_ENV[$name] = $value;
+                    $_SERVER[$name] = $value;
+                }
+            }
+            $this->laravel['config']->set('notify', require getcwd() . '/config/notify.php');
+            
+            // SMTP Overrides for standalone testing
+            $this->laravel['config']->set('mail.default', $_ENV['MAIL_MAILER'] ?? 'smtp');
+            $this->laravel['config']->set('mail.mailers.smtp', [
+                'transport' => 'smtp',
+                'host' => $_ENV['MAIL_HOST'] ?? '',
+                'port' => $_ENV['MAIL_PORT'] ?? 587,
+                'encryption' => $_ENV['MAIL_ENCRYPTION'] ?? 'tls',
+                'username' => $_ENV['MAIL_USERNAME'] ?? '',
+                'password' => $_ENV['MAIL_PASSWORD'] ?? '',
+            ]);
+            $this->laravel['config']->set('mail.from.address', $_ENV['MAIL_FROM_ADDRESS'] ?? 'hello@example.com');
+            $this->laravel['config']->set('mail.from.name', $_ENV['MAIL_FROM_NAME'] ?? 'Test');
+
+            // Force override Testbench's 'testing' Sqlite DB connection to hit our real MySQL Sandbox cleanly
+            $this->laravel['config']->set('database.default', $_ENV['DB_CONNECTION'] ?? 'mysql');
+            $this->laravel['config']->set('database.connections.mysql.host', $_ENV['DB_HOST'] ?? '127.0.0.1');
+            $this->laravel['config']->set('database.connections.mysql.port', $_ENV['DB_PORT'] ?? '3306');
+            $this->laravel['config']->set('database.connections.mysql.database', $_ENV['DB_DATABASE'] ?? 'notify_test');
+            $this->laravel['config']->set('database.connections.mysql.username', $_ENV['DB_USERNAME'] ?? 'root');
+            $this->laravel['config']->set('database.connections.mysql.password', $_ENV['DB_PASSWORD'] ?? '');
+        }
+
+        // We explicitly make the database strategy
+        $strategy = $this->laravel->make('notify.strategy.database');
+        
+        if (!$strategy instanceof QueueStrategyInterface) {
+            $this->error('Failed to resolve Queue Strategy');
+            return Command::FAILURE;
+        }
+
+        $this->info('Polling database for pending notifications...');
+        
+        try {
+            $strategy->process();
+            $this->info('✅ Queue completely processed!');
+        } catch (\Exception $e) {
+            $this->error('Failed processing queue: ' . $e->getMessage());
+        }
+
+        return Command::SUCCESS;
+    }
+}
