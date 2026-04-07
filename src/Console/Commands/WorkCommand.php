@@ -67,15 +67,16 @@ class WorkCommand extends Command
             $this->laravel['config']->set('database.connections.mysql.password', $_ENV['DB_PASSWORD'] ?? app('config')->get('database.connections.mysql.password'));
         }
 
-        // We explicitly make the database strategy
-        $strategy = $this->laravel->make('notify.strategy.database');
+        // Dynamically instantiate the queue strategy based on configuration
+        $strategyName = app('config')->get('notify.queue.strategy') ?? 'database';
+        $strategy = $this->laravel->make("notify.strategy.{$strategyName}");
         
         if (!$strategy instanceof QueueStrategyInterface) {
             $this->error('Failed to resolve Queue Strategy');
             return Command::FAILURE;
         }
 
-        $this->info('Polling database for pending notifications...');
+        $this->info("Polling {$strategyName} for pending notifications...");
         
         try {
             $strategy->process();

@@ -123,6 +123,7 @@ class RedisQueueStrategy implements QueueStrategyInterface
                 $driver->send($notifiable, $notificationObj);
 
             } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Notifluxion Redis Queue Processing Exception: " . $e->getMessage());
                 $payload['attempts'] = ($payload['attempts'] ?? 0) + 1;
                 
                 if ($payload['attempts'] < $maxRetries) {
