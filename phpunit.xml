@@ -9,8 +9,8 @@
     </testsuite>
   </testsuites>
   <php>
-    <env name="DB_CONNECTION" value="sqlite"/>
-    <env name="DB_DATABASE" value=":memory:"/>
+    <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
+    <!-- <env name="DB_DATABASE" value=":memory:"/> -->
     <!-- Twilio Keys -->
     <env name="TWILIO_SID" value="your_twilio_sid"/>
     <env name="TWILIO_TOKEN" value="your_twilio_token"/>

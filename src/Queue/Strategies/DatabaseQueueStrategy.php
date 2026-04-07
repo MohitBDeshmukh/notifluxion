@@ -121,6 +121,7 @@ class DatabaseQueueStrategy implements QueueStrategyInterface
                     
                 event(new \Notifluxion\LaravelNotify\Events\NotificationSent($notifiable, $notificationObj, $channel ?? 'email'));
             } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Notifluxion Queue Processing Exception: " . $e->getMessage());
                 $attempts = ($notification->attempts ?? 0) + 1;
                 $configBase = app('config')->get('notify') ?? [];
                 $maxRetries = $configBase['queue']['max_retries'] ?? 3;
