@@ -22,14 +22,17 @@ class TestCase extends Orchestra
         ];
     }
 
-    protected function defineDatabaseMigrations()
-    {
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
-    }
-
     protected function defineEnvironment($app)
     {
         // Set configuration defaults for testing
         $app['config']->set('notify.default.email', 'smtp');
+        
+        // Force SQLite in-memory database to strictly prevent MySQL 'forge' connection refused errors 
+        $app['config']->set('database.default', 'testing');
+        $app['config']->set('database.connections.testing', [
+            'driver'   => 'sqlite',
+            'database' => ':memory:',
+            'prefix'   => '',
+        ]);
     }
 }
