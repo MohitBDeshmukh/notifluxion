@@ -26,13 +26,5 @@ class TestCase extends Orchestra
     {
         // Set configuration defaults for testing
         $app['config']->set('notify.default.email', 'smtp');
-        
-        // Force SQLite in-memory database to strictly prevent MySQL 'forge' connection refused errors 
-        $app['config']->set('database.default', 'testing');
-        $app['config']->set('database.connections.testing', [
-            'driver'   => 'sqlite',
-            'database' => ':memory:',
-            'prefix'   => '',
-        ]);
     }
 }

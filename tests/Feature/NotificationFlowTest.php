@@ -18,9 +18,8 @@ class NotificationFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
+    protected function defineDatabaseMigrations()
     {
-        parent::setUp();
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
     }
 
