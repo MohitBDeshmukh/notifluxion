@@ -43,7 +43,6 @@ class WorkCommand extends Command
                     $_SERVER[$name] = $value;
                 }
             }
-            $this->laravel['config']->set('notify', require getcwd() . '/config/notify.php');
             
             // SMTP Overrides for standalone testing
             $this->laravel['config']->set('mail.default', $_ENV['MAIL_MAILER'] ?? app('config')->get('mail.default'));
